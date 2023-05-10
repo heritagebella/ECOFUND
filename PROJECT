@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Crowdfunding {
+    // Define the campaign details
+    string public name;
+    string public description;
+    uint public goal;
+    address payable public beneficiary;
+    
+    // Define the contributors and their contributions
+    mapping(address => uint) public contributions;
+    uint public numContributors;
+    
+    // Define the campaign state
+    enum State {
+        Fundraising,
+        Failed,
+        Successful,
+        PaidOut
+    }
+    State public state = State.Fundraising;
+    
+    // Define the events
+    event ContributionReceived(address contributor, uint amount, uint totalAmount);
+    event CampaignFailed(uint totalAmount);
+    event CampaignSucceeded(uint totalAmount);
+    event CampaignPaidOut();
+    
+    // Constructor
+    constructor(string memory _name, string memory _description, uint _goal, address payable _beneficiary) {
+        name = _name;
+        description = _description;
+        goal = _goal;
+        beneficiary = _beneficiary;
+    }
+    
+    // Function to contribute to the campaign
+    function contribute() public payable {
+        require(state == State.Fundraising, "Campaign is not in Fundraising state.");
+        require(msg.value > 0, "Contribution amount must be greater than zero.");
+        
+        contributions[msg.sender] += msg.value;
+        numContributors++;
+        
+        emit ContributionReceived(msg.sender, msg.value, address(this).balance);
+        
+        if(address(this).balance >= goal){
+            state = State.Successful;
+            emit CampaignSucceeded(address(this).balance);
+        }
+    }
+    
+    //Function to check the status of the campaign//
+    function checkCampaignStatus() public  returns (State) {
+    if (state == State.Fundraising && block.timestamp > 30 days) {
+        state = State.Failed;
+        emit CampaignFailed(address(this).balance);
+    }
+    return state;
+}
+
+    
+
+    // Function to withdraw funds for the beneficiary
+      function withdraw() public {
+        require(state == State.Successful, "Campaign is not in Successful state.");
+        require(msg.sender == beneficiary, "Only the beneficiary can withdraw the funds.");
+        
+        uint amount = address(this).balance;
+        beneficiary.transfer(amount);
+        
+        state = State.PaidOut;
+        emit CampaignPaidOut();
+    }
+}
